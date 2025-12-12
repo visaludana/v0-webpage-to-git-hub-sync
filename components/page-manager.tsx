@@ -57,7 +57,13 @@ export function PageManager({ githubConfig }: PageManagerProps) {
 
   const loadPages = async () => {
     try {
-      const { data, error } = await supabase.from("git_sync_pages").select("*").order("created_at", { ascending: true })
+      const client = getSupabaseBrowserClient()
+      if (!client) {
+        console.error("[v0] Supabase client not initialized")
+        return
+      }
+
+      const { data, error } = await client.from("git_sync_pages").select("*").order("created_at", { ascending: true })
 
       if (error) {
         console.error("[v0] Error loading pages:", error)

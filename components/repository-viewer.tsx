@@ -72,7 +72,24 @@ export function RepositoryViewer() {
         return
       }
 
+      console.log("[v0] Loaded repository tree:", {
+        totalItems: data.tree?.length || 0,
+        truncated: data.truncated,
+        types: data.tree?.reduce((acc: any, item: TreeItem) => {
+          acc[item.type] = (acc[item.type] || 0) + 1
+          return acc
+        }, {}),
+      })
+
       setTree(data.tree || [])
+
+      if (data.truncated) {
+        toast({
+          title: "Repository tree truncated",
+          description: "Your repository is very large. Some files may not be shown.",
+          variant: "default",
+        })
+      }
     } catch (error) {
       console.error("[v0] Error loading repository tree:", error)
       toast({
@@ -95,19 +112,29 @@ export function RepositoryViewer() {
     setExpandedFolders(newExpanded)
   }
 
-  // Build folder structure
   const buildFolderStructure = (): FolderStructure => {
     const structure: FolderStructure = {
       "": { files: [], subfolders: [] },
     }
 
+    // First pass: create all folders from tree items
+    tree.forEach((item) => {
+      if (item.type === "tree") {
+        // It's a directory - create it explicitly
+        if (!structure[item.path]) {
+          structure[item.path] = { files: [], subfolders: [] }
+        }
+      }
+    })
+
+    // Second pass: add files and infer any missing parent folders
     tree.forEach((item) => {
       if (item.type === "blob") {
         // It's a file
         const pathParts = item.path.split("/")
-        const fileName = pathParts[pathParts.length - 1]
         const folderPath = pathParts.slice(0, -1).join("/")
 
+        // Create folder if it doesn't exist (for files in folders not explicitly listed)
         if (!structure[folderPath]) {
           structure[folderPath] = { files: [], subfolders: [] }
         }
@@ -115,20 +142,31 @@ export function RepositoryViewer() {
       }
     })
 
-    // Build subfolder relationships
+    // Third pass: build subfolder relationships
     Object.keys(structure).forEach((folderPath) => {
       if (folderPath === "") return
 
       const pathParts = folderPath.split("/")
-      const parentPath = pathParts.slice(0, -1).join("/")
 
-      if (!structure[parentPath]) {
-        structure[parentPath] = { files: [], subfolders: [] }
-      }
+      // Ensure all parent folders exist
+      for (let i = 1; i <= pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i - 1).join("/")
+        const currentPath = pathParts.slice(0, i).join("/")
 
-      if (!structure[parentPath].subfolders.includes(folderPath)) {
-        structure[parentPath].subfolders.push(folderPath)
+        if (!structure[parentPath]) {
+          structure[parentPath] = { files: [], subfolders: [] }
+        }
+
+        if (currentPath !== parentPath && !structure[parentPath].subfolders.includes(currentPath)) {
+          structure[parentPath].subfolders.push(currentPath)
+        }
       }
+    })
+
+    console.log("[v0] Built folder structure:", {
+      totalFolders: Object.keys(structure).length,
+      rootFiles: structure[""].files.length,
+      rootSubfolders: structure[""].subfolders.length,
     })
 
     return structure

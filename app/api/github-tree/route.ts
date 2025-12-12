@@ -71,6 +71,12 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
 
+    console.log("[v0] GitHub tree response:", {
+      totalItems: data.tree.length,
+      truncated: data.truncated,
+      samplePaths: data.tree.slice(0, 5).map((item: any) => ({ path: item.path, type: item.type })),
+    })
+
     // Transform the tree data into a more usable format
     const tree = data.tree.map((item: any) => ({
       path: item.path,

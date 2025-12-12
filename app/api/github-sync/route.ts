@@ -8,20 +8,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Check if file exists to get SHA
-    const checkUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`
-    const checkResponse = await fetch(checkUrl, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github.v3+json",
-        "User-Agent": "WebpageSync/1.0",
-      },
-    })
+    console.log("[v0] Syncing file:", filePath)
 
     let sha: string | undefined
-    if (checkResponse.ok) {
-      const existingFile = await checkResponse.json()
-      sha = existingFile.sha
+    try {
+      const checkUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`
+      const checkResponse = await fetch(checkUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "WebpageSync/1.0",
+        },
+      })
+
+      if (checkResponse.ok) {
+        const existingFile = await checkResponse.json()
+        sha = existingFile.sha
+        console.log("[v0] File exists, will update with SHA:", sha)
+      } else if (checkResponse.status === 404) {
+        console.log("[v0] File doesn't exist, will create new file")
+      }
+      // Silently ignore other status codes and proceed with creation
+    } catch (checkError) {
+      // Silently handle check errors - we'll attempt to create the file
+      console.log("[v0] File doesn't exist, will create new file")
     }
 
     // Create or update file
@@ -61,6 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json()
+    console.log("[v0] Successfully synced file:", filePath)
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
     console.error("[v0] Error syncing to GitHub:", error)

@@ -30,7 +30,13 @@ export function GitHubConfig({ config, onConfigChange }: GitHubConfigProps) {
 
   const loadConfig = async () => {
     try {
-      const { data, error } = await supabase
+      const client = getSupabaseBrowserClient()
+      if (!client) {
+        console.error("[v0] Supabase client not initialized")
+        return
+      }
+
+      const { data, error } = await client
         .from("git_sync_acc")
         .select("*")
         .order("created_at", { ascending: false })
